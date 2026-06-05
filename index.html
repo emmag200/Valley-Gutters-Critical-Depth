@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Critical Depth — Valley Gutter Solver</title>
+
+<!-- KaTeX for crisp formula rendering -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<!-- Fonts: technical / engineering pairing -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0e1726;
+  --ink-2:#33425a;
+  --muted:#697a96;
+  --line:#d7deea;
+  --line-soft:#e7ecf4;
+  --bg:#eef2f8;
+  --paper:#ffffff;
+  --water:#1d6fb8;
+  --water-deep:#0f4f8c;
+  --water-soft:#9fc6ea;
+  --accent:#e3592a;
+  --ok:#1d8a5b;
+  --warn:#b8761b;
+  --warn-bg:#fdf4e3;
+  --err:#c0392b;
+  --shadow:0 1px 2px rgba(16,30,55,.06),0 8px 24px rgba(16,30,55,.07);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"IBM Plex Sans",sans-serif;
+  color:var(--ink);
+  background:var(--bg);
+  /* blueprint grid texture */
+  background-image:
+    linear-gradient(rgba(29,111,184,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(29,111,184,.045) 1px,transparent 1px);
+  background-size:24px 24px;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.5;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
+
+/* ---------- Header ---------- */
+header.top{
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px 28px;
+  justify-content:space-between;margin-bottom:26px;
+}
+.brand{display:flex;align-items:center;gap:16px}
+.glyph{
+  width:52px;height:52px;flex:none;border-radius:12px;
+  background:linear-gradient(150deg,var(--water),var(--water-deep));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.15),0 6px 18px rgba(15,79,140,.32);
+  position:relative;overflow:hidden;
+}
+.glyph svg{position:absolute;inset:0}
+h1{
+  font-family:"Archivo",sans-serif;font-weight:800;font-size:23px;
+  letter-spacing:-.02em;margin:0;line-height:1.05;
+}
+h1 small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:500;
+  font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+
+.controls{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.ctl{display:flex;flex-direction:column;gap:5px}
+.ctl label{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);font-weight:500}
+.seg{display:inline-flex;background:var(--paper);border:1px solid var(--line);
+  border-radius:10px;padding:3px;box-shadow:var(--shadow)}
+.seg button{
+  border:0;background:transparent;font-family:"IBM Plex Mono",monospace;font-size:12px;
+  font-weight:500;color:var(--ink-2);padding:7px 12px;border-radius:7px;cursor:pointer;
+  transition:.16s;white-space:nowrap;
+}
+.seg button.on{background:var(--ink);color:#fff}
+.g-field{width:78px;font-family:"IBM Plex Mono",monospace;font-size:13px;
+  border:1px solid var(--line);border-radius:9px;padding:8px 9px;background:var(--paper);
+  color:var(--ink);box-shadow:var(--shadow)}
+
+/* ---------- Case selector ---------- */
+.cases{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px}
+.case-tab{
+  text-align:left;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--radius);padding:13px 13px 14px;cursor:pointer;position:relative;
+  transition:.18s;box-shadow:var(--shadow);overflow:hidden;
+}
+.case-tab:hover{transform:translateY(-2px);border-color:var(--water-soft)}
+.case-tab .num{font-family:"Archivo",sans-serif;font-weight:800;font-size:13px;
+  color:var(--muted);display:flex;align-items:center;gap:7px}
+.case-tab .num i{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);
+  display:grid;place-items:center;font-style:normal;font-size:11px;color:var(--ink-2)}
+.case-tab .ttl{font-weight:600;font-size:13px;margin:8px 0 6px;line-height:1.25;letter-spacing:-.01em}
+.case-tab .meth{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--water-deep);background:#eaf3fb;
+  display:inline-block;padding:3px 7px;border-radius:5px}
+.case-tab.on{border-color:var(--water);box-shadow:0 0 0 1px var(--water),0 10px 26px rgba(15,79,140,.18)}
+.case-tab.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--water)}
+.case-tab.on .num i{border-color:var(--water);background:var(--water);color:#fff}
+
+/* ---------- Panel ---------- */
+.panel{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:start}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow)}
+.card .hd{padding:16px 20px;border-bottom:1px solid var(--line-soft);
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card .hd h2{font-family:"Archivo",sans-serif;font-weight:700;font-size:15px;margin:0;letter-spacing:-.01em}
+.card .hd .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.card .bd{padding:20px}
+
+/* diagram placeholder */
+.diagram-wrap{padding:18px 20px}
+.diagram{
+  position:relative;width:100%;border-radius:10px;border:1.5px dashed var(--water-soft);
+  background:
+    repeating-linear-gradient(45deg,transparent,transparent 9px,rgba(29,111,184,.04) 9px,rgba(29,111,184,.04) 10px),
+    #f6f9fc;
+  aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;
+}
+.diagram img{width:100%;height:100%;object-fit:contain;display:block}
+.diagram .ph{text-align:center;color:var(--muted);padding:18px}
+.diagram .ph .ico{font-size:26px;margin-bottom:8px;opacity:.5}
+.diagram .ph code{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--water-deep);
+  background:#eaf3fb;padding:3px 8px;border-radius:5px;display:inline-block;margin-top:6px}
+.cap{font-size:12px;color:var(--muted);margin:12px 2px 0;line-height:1.45}
+
+.formula{padding:18px 20px;border-top:1px solid var(--line-soft);background:#fbfcfe;
+  border-radius:0 0 var(--radius) var(--radius)}
+.formula .lab{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.formula .math{overflow-x:auto;padding:4px 0}
+.formula .math .katex{font-size:1.04em}
+
+/* inputs */
+.field{margin-bottom:15px}
+.field:last-of-type{margin-bottom:0}
+.field label{display:flex;align-items:baseline;justify-content:space-between;
+  font-size:12.5px;font-weight:500;margin-bottom:6px;color:var(--ink-2)}
+.field label .desc{font-size:11px;color:var(--muted);font-weight:400}
+.input-row{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;background:#fff;transition:.15s}
+.input-row:focus-within{border-color:var(--water);box-shadow:0 0 0 3px rgba(29,111,184,.12)}
+.input-row .sym{display:grid;place-items:center;width:42px;background:#f4f7fb;
+  border-right:1px solid var(--line-soft);font-family:"IBM Plex Mono",monospace;
+  font-size:13px;color:var(--ink-2)}
+.input-row input{flex:1;border:0;outline:0;padding:10px 12px;font-family:"IBM Plex Mono",monospace;
+  font-size:14px;color:var(--ink);background:transparent;min-width:0}
+.input-row .unit{display:grid;place-items:center;padding:0 12px;background:#f4f7fb;
+  border-left:1px solid var(--line-soft);font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;color:var(--muted);white-space:nowrap}
+
+.btn{width:100%;margin-top:20px;border:0;border-radius:11px;padding:13px;cursor:pointer;
+  font-family:"Archivo",sans-serif;font-weight:700;font-size:14px;letter-spacing:.01em;color:#fff;
+  background:linear-gradient(150deg,var(--water),var(--water-deep));
+  box-shadow:0 6px 16px rgba(15,79,140,.28);transition:.16s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 9px 22px rgba(15,79,140,.34)}
+.btn:active{transform:translateY(0)}
+
+/* results */
+.result{margin-top:2px}
+.hero{
+  background:linear-gradient(155deg,#103a63,#0c2b4a);color:#fff;border-radius:12px;
+  padding:20px 22px;margin-bottom:16px;position:relative;overflow:hidden;
+}
+.hero::after{content:"";position:absolute;right:-30px;bottom:-40px;width:160px;height:160px;
+  border-radius:50%;background:radial-gradient(circle,rgba(159,198,234,.25),transparent 70%)}
+.hero .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:#9fc6ea}
+.hero .v{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:38px;
+  letter-spacing:-.01em;margin-top:4px;display:flex;align-items:baseline;gap:8px}
+.hero .v span{font-size:17px;color:#9fc6ea;font-weight:500}
+.hero .sub{font-size:12px;color:#bcd4ec;margin-top:6px;font-family:"IBM Plex Mono",monospace}
+
+.rtable{width:100%;border-collapse:collapse;font-size:13px}
+.rtable tr{border-bottom:1px solid var(--line-soft)}
+.rtable tr:last-child{border-bottom:0}
+.rtable td{padding:10px 2px}
+.rtable td:first-child{color:var(--ink-2)}
+.rtable td:first-child small{color:var(--muted);font-size:11px}
+.rtable td:last-child{text-align:right;font-family:"IBM Plex Mono",monospace;font-weight:500}
+.rtable td .u{color:var(--muted);font-size:11.5px;font-weight:400;margin-left:3px}
+
+.note{display:flex;gap:10px;padding:11px 13px;border-radius:9px;font-size:12.5px;
+  line-height:1.45;margin-top:12px}
+.note.warn{background:var(--warn-bg);color:#7a5210;border:1px solid #f0dcae}
+.note.err{background:#fbeae8;color:#8a2018;border:1px solid #f1c4bd}
+.note.ok{background:#eafaf2;color:#0c5e3c;border:1px solid #bfe9d3}
+.note .ic{font-weight:700;flex:none}
+
+.empty{color:var(--muted);text-align:center;padding:34px 16px;font-size:13.5px}
+.empty .big{font-size:30px;opacity:.35;margin-bottom:10px}
+
+.froude{margin-top:14px;padding:11px 13px;border-radius:9px;background:#f4f7fb;
+  border:1px solid var(--line-soft);font-family:"IBM Plex Mono",monospace;font-size:12px;
+  color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
+.froude b{color:var(--ok)}
+
+footer{margin-top:40px;text-align:center;font-size:11.5px;color:var(--muted);
+  font-family:"IBM Plex Mono",monospace;letter-spacing:.04em}
+footer a{color:var(--water-deep)}
+
+@media(max-width:920px){
+  .cases{grid-template-columns:repeat(2,1fr)}
+  .panel{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .cases{grid-template-columns:1fr}
+  header.top{align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="glyph">
+        <svg viewBox="0 0 52 52" fill="none">
+          <path d="M6 14 L26 40 L46 22" stroke="rgba(255,255,255,.9)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6 24 L26 40 L46 30" stroke="rgba(159,198,234,.7)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6" y1="14" x2="46" y2="14" stroke="rgba(255,255,255,.5)" stroke-width="1.4" stroke-dasharray="3 3"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Valley Gutter Critical Depth
+          <small>Hydraulic Solver · y&#8203;c from Q²/g = A³/B</small>
+        </h1>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label>Units</label>
+        <div class="seg" id="unitSeg">
+          <button data-unit="mm" class="on">mm · L/s</button>
+          <button data-unit="si">m · m³/s</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Gravity g</label>
+        <input class="g-field" id="gField" type="number" step="0.001" value="9.81">
+      </div>
+    </div>
+  </header>
+
+  <nav class="cases" id="caseNav"></nav>
+
+  <section class="panel">
+    <!-- LEFT: diagram + formula -->
+    <div class="card">
+      <div class="hd">
+        <h2 id="diagTitle">—</h2>
+        <span class="tag" id="diagMeth">—</span>
+      </div>
+      <div class="diagram-wrap">
+        <div class="diagram" id="diagram"></div>
+        <p class="cap" id="diagCap"></p>
+      </div>
+      <div class="formula">
+        <div class="lab">Governing relation</div>
+        <div class="math" id="formulaBox"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: inputs + results -->
+    <div class="card">
+      <div class="hd">
+        <h2>Inputs &amp; Result</h2>
+        <span class="tag">solve for y&#8203;c</span>
+      </div>
+      <div class="bd">
+        <div id="inputs"></div>
+        <button class="btn" id="calcBtn">Compute critical depth</button>
+        <div class="result" id="result">
+          <div class="empty"><div class="big">∿</div>Enter values and compute to see the critical depth.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Static build for Netlify · place diagram images in <code style="font-family:inherit">/images/</code> ·
+    formulas verified against Q²/g = A³/B
+  </footer>
+</div>
+
+<script>
+/* ===========================================================
+   CONSTANTS & UNIT HANDLING
+   =========================================================== */
+const STATE = { unit:'mm', case:0 };
+function gVal(){ const v=parseFloat(document.getElementById('gField').value); return (isFinite(v)&&v>0)?v:9.81; }
+
+// conversion of an input value -> SI base (m or m^3/s)
+const U = {
+  mm: { lenF:0.001, lenLab:'mm', flowF:0.001, flowLab:'L/s' },
+  si: { lenF:1,     lenLab:'m',  flowF:1,     flowLab:'m³/s' }
+};
+function uu(){ return U[STATE.unit]; }
+const toRad = d => d*Math.PI/180;
+function fmt(x, dp=3){
+  if(!isFinite(x)) return '—';
+  if(Math.abs(x)>=1000) return x.toLocaleString(undefined,{maximumFractionDigits:1});
+  return x.toFixed(dp);
+}
+// SI metre value -> display in current length unit
+const Lout = m => m / uu().lenF;
+const LunitLab = () => uu().lenLab;
+
+/* ===========================================================
+   SHARED NEWTON / BISECTION SOLVER (safeguarded)
+   =========================================================== */
+function solveHybrid(f, fp, lo, hi){
+  let flo=f(lo), fhi=f(hi), tries=0;
+  while(flo*fhi>0 && tries<80){ hi*=1.6; fhi=f(hi); tries++; }
+  if(flo*fhi>0) return {x:NaN, iter:tries, ok:false};
+  if(flo>0){ [lo,hi]=[hi,lo]; }           // ensure f(lo)<0
+  let x=0.5*(lo+hi), iter=0;
+  for(;iter<200;iter++){
+    const fx=f(x);
+    if(fx>0) hi=x; else lo=x;
+    const d=fp(x);
+    let xn = d!==0 ? x - fx/d : 0.5*(lo+hi);
+    if(!(xn>Math.min(lo,hi) && xn<Math.max(lo,hi))) xn=0.5*(lo+hi);
+    if(Math.abs(xn-x)<1e-13){ x=xn; iter++; break; }
+    x=xn;
+  }
+  return {x, iter, ok:true};
+}
+
+/* froude verification number: Q^2 * T / (g A^3) should be ~1 */
+function froude(Q,T,A,g){ return Q*Q*T/(g*A*A*A); }
+
+/* ===========================================================
+   CASE DEFINITIONS
+   Each: title, short, method, caption, image, formula (katex),
+         fields[], solve(vals)->{ycSI, A, T, rows[], warnings[]}
+   field: {key,sym,label,desc,type:'length'|'flow'|'angle',def}
+   solve receives SI values (lengths in m, flow in m³/s, angles in rad already as tan-ready? -> we pass tan)
+   =========================================================== */
+const CASES = [
+  /* ===== TYPE 1 : Regular Valley Gutter — equal side walls (single angle φ) ===== */
+  {
+    title:"Type 1 — Regular Valley Gutter",
+    short:"Regular V", method:"Closed form",
+    img:"images/case1.png",
+    cap:"Equal side wall slopes — two walls at the same angle φ meeting at a central vertex. Top width B is a result, not an input.",
+    formula:"y_c=\\left(\\dfrac{2\\,Q^{2}\\tan^{2}\\phi}{g}\\right)^{1/5}",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:30},
+      {key:'ph',sym:'φ',label:'Side wall angle',desc:'both walls, from horizontal',type:'angle',def:20},
+    ],
+    solve(v,g){
+      const x=Math.tan(v.ph);
+      const yc=Math.pow(2*v.Q*v.Q*x*x/g,1/5);
+      const A=yc*yc/x, T=2*yc/x;
+      const w=[];
+      if(v.ph<=0||v.ph>=Math.PI/2) w.push(['err','Wall angle must be between 0° and 90°.']);
+      return {ycSI:yc,A,T,rows:[
+        ['Top width B','2·y_c⁄tanφ',Lout(T),LunitLab()],
+        ['Flow area A','y_c²⁄tanφ',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:w};
+    }
+  },
+
+  /* ===== TYPE 2 : Irregular Valley Gutter — unequal side walls (θ, φ) ===== */
+  {
+    title:"Type 2 — Irregular Valley Gutter",
+    short:"Irregular V", method:"Closed form",
+    img:"images/case2.png",
+    cap:"Unequal side wall slopes — left wall at θ, right wall at φ, meeting at a vertex; both reach the free surface. Top width B is a result.",
+    formula:"y_c=\\left[\\dfrac{8Q^2}{g}\\left(\\dfrac{\\tan\\theta\\,\\tan\\phi}{\\tan\\theta+\\tan\\phi}\\right)^{2}\\right]^{1/5}",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:30},
+      {key:'th',sym:'θ',label:'Left wall angle',desc:'from horizontal',type:'angle',def:30},
+      {key:'ph',sym:'φ',label:'Right wall angle',desc:'from horizontal',type:'angle',def:20},
+    ],
+    solve(v,g){
+      const x=Math.tan(v.th), y=Math.tan(v.ph);
+      const yc=Math.pow(8*v.Q*v.Q/g*Math.pow(x*y/(x+y),2),1/5);
+      const T=yc*(1/x+1/y), A=0.5*yc*yc*(1/x+1/y);
+      const w=[];
+      if(v.th<=0||v.ph<=0||v.th>=Math.PI/2||v.ph>=Math.PI/2) w.push(['err','Wall angles must be between 0° and 90°.']);
+      return {ycSI:yc,A,T,rows:[
+        ['Top width B','y_c(1⁄tanθ+1⁄tanφ)',Lout(T),LunitLab()],
+        ['Flow area A','',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:w};
+    }
+  },
+
+  /* ===== TYPE 3 : Equal side wall angles + part vertical walls (fixed B, angle φ) ===== */
+  {
+    title:"Type 3 — Equal Angles + Part Vertical Walls",
+    short:"Equal + vertical", method:"Closed form",
+    img:"images/case3.png",
+    cap:"Fixed top width B with vertical sides over a symmetric V-bottom of side slope φ. Valid while the depth exceeds the V apex.",
+    formula:"y_c=\\left(\\dfrac{Q^{2}}{g\\,B^{2}}\\right)^{1/3}+\\dfrac{B\\tan\\phi}{4}",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:30},
+      {key:'B',sym:'B',label:'Top width',desc:'fixed gutter width',type:'length',def:400},
+      {key:'ph',sym:'φ',label:'V-bottom angle',desc:'both sides, from horizontal',type:'angle',def:15},
+    ],
+    solve(v,g){
+      const V=Math.tan(v.ph);
+      const yc=Math.pow(v.Q*v.Q/(g*v.B*v.B),1/3)+v.B*V/4;
+      const A=v.B*yc - v.B*v.B*V/4, T=v.B;     // correct geometric area = B·yc − B²v/4
+      const apex=v.B*V/2;
+      const w=[];
+      if(yc<apex) w.push(['warn','Depth is below the V apex ('+fmt(Lout(apex))+' '+LunitLab()+'); the section is a partial V — treat as a Type 1/2 V instead.']);
+      return {ycSI:yc,A,T,rows:[
+        ['Top width B','fixed',Lout(v.B),LunitLab()],
+        ['V-apex depth','(B⁄2)·tanφ',Lout(apex),LunitLab()],
+        ['Flow area A','B·y_c − B²tanφ⁄4',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:w};
+    }
+  },
+
+  /* ===== TYPE 4 : Unequal slopes + 1 part vertical wall, fixed B (quadratic) ===== */
+  {
+    title:"Type 4 — Unequal Slopes + 1 Vertical Wall",
+    short:"1 vertical wall", method:"Quadratic",
+    img:"images/case4.png",
+    cap:"Fixed top width B. Left wall (slope θ) falls to an off-centre vertex; right wall (slope φ<θ) rises, then one short vertical wall closes the right edge. Solved as a quadratic in y_c.",
+    formula:"\\underbrace{\\tfrac{w+v}{2w^{2}}}_{a}\\,y_c^{2}\\;\\underbrace{-\\,B\\!\\left(1+\\tfrac{v}{w}\\right)}_{b}y_c\\;+\\;\\underbrace{\\tfrac{vB^{2}}{2}+\\!\\left(\\tfrac{BQ^{2}}{g}\\right)^{1/3}}_{c}=0",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:40},
+      {key:'B',sym:'B',label:'Top width',desc:'fixed gutter width',type:'length',def:500},
+      {key:'th',sym:'θ',label:'Left wall angle',desc:'w = tanθ',type:'angle',def:35},
+      {key:'ph',sym:'φ',label:'Right wall angle',desc:'v = tanφ (φ<θ)',type:'angle',def:15},
+    ],
+    solve(v,g){
+      const W=Math.tan(v.th), V=Math.tan(v.ph), B=v.B;
+      const a=(W+V)/(2*W*W);
+      const b=-B*(1+V/W);
+      const c=B*B*V/2 + Math.pow(B*v.Q*v.Q/g,1/3);
+      const disc=b*b-4*a*c;
+      if(disc<0) return {ycSI:NaN,A:NaN,T:B,rows:[],warnings:[['err','No real solution: discharge is too large for this geometry (negative discriminant).']]};
+      const r1=(-b+Math.sqrt(disc))/(2*a), r2=(-b-Math.sqrt(disc))/(2*a);
+      const cand=[r1,r2].filter(r=>r>0 && r<=B*W+1e-9).sort((p,q)=>p-q);
+      if(!cand.length) return {ycSI:NaN,A:NaN,T:B,rows:[],warnings:[['err','Roots fall outside the valid range (vertex would lie beyond the gutter width).']]};
+      const yc=cand[0];
+      const A=B*yc - yc*yc/(2*W) - 0.5*Math.pow(B-yc/W,2)*V;
+      const B1=yc/W, y1=(B-yc/W)*V;
+      const w=[];
+      if(cand.length>1) w.push(['warn','Two valid roots ('+fmt(Lout(cand[0]))+' & '+fmt(Lout(cand[1]))+' '+LunitLab()+'); the smaller physical depth is shown.']);
+      return {ycSI:yc,A,T:B,rows:[
+        ['Left run B₁','y_c⁄w',Lout(B1),LunitLab()],
+        ['Right wall height y₁','(B−B₁)·v',Lout(y1),LunitLab()],
+        ['Flow area A','',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:w};
+    }
+  },
+
+  /* ===== TYPE 5 : Unequal slopes + part vertical walls, B1 & B2 given ===== */
+  {
+    title:"Type 5 — Unequal Slopes + Part Vertical Walls",
+    short:"Part vertical walls", method:"Closed form",
+    img:"images/case5.png",
+    cap:"Two sloped bottom segments (runs B₁, B₂ at slopes θ, φ) meeting at a vertex, with vertical side walls up to the surface. Top width B = B₁ + B₂.",
+    formula:"y_c=\\left(\\dfrac{Q^{2}}{B^{2}g}\\right)^{1/3}+\\dfrac{B_1^{2}\\tan\\theta+B_2^{2}\\tan\\phi}{2(B_1+B_2)}",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:60},
+      {key:'B1',sym:'B₁',label:'Left run',desc:'horizontal',type:'length',def:150},
+      {key:'B2',sym:'B₂',label:'Right run',desc:'horizontal',type:'length',def:250},
+      {key:'th',sym:'θ',label:'Left slope angle',desc:'w = tanθ',type:'angle',def:30},
+      {key:'ph',sym:'φ',label:'Right slope angle',desc:'v = tanφ (φ<θ)',type:'angle',def:20},
+    ],
+    solve(v,g){
+      const w=Math.tan(v.th), V=Math.tan(v.ph), B=v.B1+v.B2;
+      const yc=Math.pow(v.Q*v.Q/(B*B*g),1/3)+(w*v.B1*v.B1+V*v.B2*v.B2)/(2*B);
+      const A=yc*B - 0.5*(w*v.B1*v.B1+V*v.B2*v.B2);
+      const needD=Math.max(v.B1*w,v.B2*V);
+      const warn=[];
+      if(yc<needD) warn.push(['warn','Depth is below the deepest vertex drop ('+fmt(Lout(needD))+' '+LunitLab()+'); a vertical wall would not yet be submerged — geometry assumption breaks down.']);
+      return {ycSI:yc,A,T:B,rows:[
+        ['Top width B','B₁+B₂',Lout(B),LunitLab()],
+        ['Left vertex drop','B₁·tanθ',Lout(v.B1*w),LunitLab()],
+        ['Right vertex drop','B₂·tanφ',Lout(v.B2*V),LunitLab()],
+        ['Flow area A','',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:warn};
+    }
+  },
+
+  /* ===== TYPE 6 : Unequal slopes + 1 part vertical wall, B2 given (Newton) ===== */
+  {
+    title:"Type 6 — Irregular (B₂ given, no closed form)",
+    short:"1 vert. wall (Newton)", method:"Newton's method",
+    img:"images/case6.png",
+    cap:"Left wall slope θ, right wall slope φ over run B₂, then one vertical side wall. The relation A³ = (Q²/g)·B is a sextic in y_c with no closed form — solved numerically.",
+    formula:"\\Big(\\tfrac{y_c^{2}}{2w}+B_2\\,y_c-\\tfrac{B_2^{2}v}{2}\\Big)^{3}=\\dfrac{Q^{2}}{g}\\Big(\\tfrac{y_c}{w}+B_2\\Big)",
+    fields:[
+      {key:'Q',sym:'Q',label:'Discharge',type:'flow',def:50},
+      {key:'B2',sym:'B₂',label:'Sloped run',desc:'right, before vertical wall',type:'length',def:250},
+      {key:'th',sym:'θ',label:'Left wall angle',desc:'w = tanθ',type:'angle',def:30},
+      {key:'ph',sym:'φ',label:'Right wall angle',desc:'v = tanφ (φ<θ)',type:'angle',def:18},
+    ],
+    solve(v,g){
+      const w=Math.tan(v.th), vv=Math.tan(v.ph), B2=v.B2, k=v.Q*v.Q/g;
+      const Af=y=> y*y/(2*w)+B2*y-B2*B2*vv/2;
+      const Bf=y=> y/w+B2;
+      const f =y=> Math.pow(Af(y),3)-k*Bf(y);
+      const fp=y=> 3*Math.pow(Af(y),2)*(y/w+B2)-k*(1/w);
+      const lo=B2*(Math.sqrt(w*w+w*vv)-w)+1e-9;
+      const sol=solveHybrid(f,fp,lo,lo+0.05);
+      if(!sol.ok||!isFinite(sol.x)) return {ycSI:NaN,A:NaN,T:NaN,rows:[],warnings:[['err','Solver failed to bracket a root for these inputs.']]};
+      const yc=sol.x, A=Af(yc), B=Bf(yc), B1=yc/w;
+      const warn=[];
+      if(yc<B2*vv) warn.push(['warn','Depth is below the top of the sloped wall (B₂·v = '+fmt(Lout(B2*vv))+' '+LunitLab()+'); water has not reached the vertical wall, so the section is a plain Type 2 V here.']);
+      if(B>0.4 && STATE.unit==='mm') warn.push(['warn','Top width B = '+fmt(Lout(B))+' mm exceeds the 400 mm maximum gutter width noted on the drawing.']);
+      warn.push(['ok','Converged in '+sol.iter+' iterations (safeguarded Newton + bisection).']);
+      return {ycSI:yc,A,T:B,rows:[
+        ['Top width B','y_c⁄w + B₂',Lout(B),LunitLab()],
+        ['Left run B₁','y_c⁄w',Lout(B1),LunitLab()],
+        ['Sloped-wall top','B₂·v',Lout(B2*vv),LunitLab()],
+        ['Flow area A','',A,'m²'],
+        ['Mean velocity','V = Q/A',v.Q/A,'m/s'],
+      ],warnings:warn};
+    }
+  },
+];
+
+/* ===========================================================
+   RENDERING
+   =========================================================== */
+function buildNav(){
+  const nav=document.getElementById('caseNav'); nav.innerHTML='';
+  CASES.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='case-tab'+(i===STATE.case?' on':'');
+    b.innerHTML=`<div class="num"><i>${i+1}</i></div>
+      <div class="ttl">${c.short}</div>
+      <span class="meth">${c.method}</span>`;
+    b.onclick=()=>{ STATE.case=i; render(); };
+    nav.appendChild(b);
+  });
+}
+
+function katex(el,tex){
+  try{ window.katex.render(tex,el,{throwOnError:false,displayMode:true}); }
+  catch(e){ el.textContent=tex; }
+}
+
+function render(){
+  buildNav();
+  const c=CASES[STATE.case], u=uu();
+  document.getElementById('diagTitle').textContent=c.title;
+  document.getElementById('diagMeth').textContent=c.method;
+  document.getElementById('diagCap').textContent=c.cap;
+
+  // diagram placeholder with graceful image fallback
+  const d=document.getElementById('diagram');
+  d.innerHTML='';
+  const img=new Image();
+  img.alt=c.title;
+  img.onerror=()=>{ d.innerHTML=`<div class="ph"><div class="ico">▱</div>
+      Drop the cross-section diagram here<br><code>${c.img}</code></div>`; };
+  img.onload =()=>{ d.innerHTML=''; d.appendChild(img); };
+  img.src=c.img;
+
+  // formula
+  katex(document.getElementById('formulaBox'), c.formula);
+
+  // inputs
+  const wrap=document.getElementById('inputs'); wrap.innerHTML='';
+  c.fields.forEach(fld=>{
+    const unitLab = fld.type==='flow'?u.flowLab : fld.type==='angle'?'deg' : u.lenLab;
+    const div=document.createElement('div'); div.className='field';
+    div.innerHTML=`<label>${fld.label}${fld.desc?` <span class="desc">${fld.desc}</span>`:''}</label>
+      <div class="input-row">
+        <div class="sym">${fld.sym}</div>
+        <input type="number" step="any" id="in_${fld.key}" value="${fld.def}">
+        <div class="unit">${unitLab}</div>
+      </div>`;
+    wrap.appendChild(div);
+  });
+
+  document.getElementById('result').innerHTML=
+    `<div class="empty"><div class="big">∿</div>Enter values and compute to see the critical depth.</div>`;
+}
+
+/* ===========================================================
+   COMPUTE
+   =========================================================== */
+function compute(){
+  const c=CASES[STATE.case], u=uu(), g=gVal();
+  const vals={};
+  let bad=false;
+  c.fields.forEach(fld=>{
+    let raw=parseFloat(document.getElementById('in_'+fld.key).value);
+    if(!isFinite(raw)){ bad=true; }
+    if(fld.type==='flow')      vals[fld.key]=raw*u.flowF;
+    else if(fld.type==='length')vals[fld.key]=raw*u.lenF;
+    else if(fld.type==='angle') vals[fld.key]=toRad(raw);
+  });
+  const res=document.getElementById('result');
+  if(bad){ res.innerHTML=`<div class="note err"><span class="ic">!</span>Please fill in every field with a valid number.</div>`; return; }
+
+  const out=c.solve(vals,g);
+
+  // build warnings html
+  let warnHtml='';
+  (out.warnings||[]).forEach(([t,msg])=>{
+    const ic = t==='err'?'✕': t==='warn'?'⚠':'✓';
+    warnHtml+=`<div class="note ${t}"><span class="ic">${ic}</span><div>${msg}</div></div>`;
+  });
+
+  if(!isFinite(out.ycSI)){
+    res.innerHTML=warnHtml || `<div class="note err"><span class="ic">✕</span>No valid solution for these inputs.</div>`;
+    return;
+  }
+
+  // rows
+  let rows='';
+  out.rows.forEach(([k,sub,val,unit])=>{
+    rows+=`<tr><td>${k}${sub?` <small>${sub}</small>`:''}</td>
+      <td>${fmt(val, unit==='m/s'?3:(unit==='m²'?5: (STATE.unit==='mm'?1:4)))}<span class="u">${unit}</span></td></tr>`;
+  });
+
+  const Fr=froude(vals.Q,out.T,out.A,g);
+
+  res.innerHTML=`
+    <div class="hero">
+      <div class="k">Critical depth y&#8203;c</div>
+      <div class="v">${fmt(Lout(out.ycSI), STATE.unit==='mm'?1:4)}<span>${u.lenLab}</span></div>
+      <div class="sub">= ${fmt(out.ycSI,4)} m</div>
+    </div>
+    <table class="rtable">${rows}</table>
+    <div class="froude"><span>Froude check &nbsp;Q²·B ⁄ (g·A³)</span><b>${Fr.toFixed(4)} ≈ 1</b></div>
+    ${warnHtml}`;
+}
+
+/* ===========================================================
+   WIRING
+   =========================================================== */
+document.getElementById('unitSeg').addEventListener('click',e=>{
+  const btn=e.target.closest('button'); if(!btn) return;
+  STATE.unit=btn.dataset.unit;
+  document.querySelectorAll('#unitSeg button').forEach(b=>b.classList.toggle('on',b===btn));
+  render();
+});
+document.getElementById('calcBtn').addEventListener('click',compute);
+document.getElementById('gField').addEventListener('change',()=>{});
+
+window.addEventListener('load',()=>{ render(); });
+</script>
+</body>
+</html>
