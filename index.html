@@ -351,7 +351,7 @@ const CASES = [
   {
     title:"Type 1 — Regular Valley Gutter",
     short:"Regular V", method:"Closed form",
-    img:"images/case1.png",
+    img:"Case1.png",
     cap:"Equal side wall slopes — two walls at the same angle φ meeting at a central vertex. Top width B is a result, not an input.",
     formula:"y_c=\\left(\\dfrac{2\\,Q^{2}\\tan^{2}\\phi}{g}\\right)^{1/5}",
     fields:[
@@ -376,7 +376,7 @@ const CASES = [
   {
     title:"Type 2 — Irregular Valley Gutter",
     short:"Irregular V", method:"Closed form",
-    img:"images/case2.png",
+    img:"Case2.png",
     cap:"Unequal side wall slopes — left wall at θ, right wall at φ, meeting at a vertex; both reach the free surface. Top width B is a result.",
     formula:"y_c=\\left[\\dfrac{8Q^2}{g}\\left(\\dfrac{\\tan\\theta\\,\\tan\\phi}{\\tan\\theta+\\tan\\phi}\\right)^{2}\\right]^{1/5}",
     fields:[
@@ -402,7 +402,7 @@ const CASES = [
   {
     title:"Type 3 — Equal Angles + Part Vertical Walls",
     short:"Equal + vertical", method:"Closed form",
-    img:"images/case3.png",
+    img:"Case3.png",
     cap:"Fixed top width B with vertical sides over a symmetric V-bottom of side slope φ. Valid while the depth exceeds the V apex.",
     formula:"y_c=\\left(\\dfrac{Q^{2}}{g\\,B^{2}}\\right)^{1/3}+\\dfrac{B\\tan\\phi}{4}",
     fields:[
@@ -430,7 +430,7 @@ const CASES = [
   {
     title:"Type 4 — Unequal Slopes + 1 Vertical Wall",
     short:"1 vertical wall", method:"Quadratic",
-    img:"images/case4.png",
+    img:"Case4.png",
     cap:"Fixed top width B. Left wall (slope θ) falls to an off-centre vertex; right wall (slope φ<θ) rises, then one short vertical wall closes the right edge. Solved as a quadratic in y_c.",
     formula:"\\underbrace{\\tfrac{w+v}{2w^{2}}}_{a}\\,y_c^{2}\\;\\underbrace{-\\,B\\!\\left(1+\\tfrac{v}{w}\\right)}_{b}y_c\\;+\\;\\underbrace{\\tfrac{vB^{2}}{2}+\\!\\left(\\tfrac{BQ^{2}}{g}\\right)^{1/3}}_{c}=0",
     fields:[
@@ -467,7 +467,7 @@ const CASES = [
   {
     title:"Type 5 — Unequal Slopes + Part Vertical Walls",
     short:"Part vertical walls", method:"Closed form",
-    img:"images/case5.png",
+    img:"Case5.png",
     cap:"Two sloped bottom segments (runs B₁, B₂ at slopes θ, φ) meeting at a vertex, with vertical side walls up to the surface. Top width B = B₁ + B₂.",
     formula:"y_c=\\left(\\dfrac{Q^{2}}{B^{2}g}\\right)^{1/3}+\\dfrac{B_1^{2}\\tan\\theta+B_2^{2}\\tan\\phi}{2(B_1+B_2)}",
     fields:[
@@ -498,7 +498,7 @@ const CASES = [
   {
     title:"Type 6 — Irregular (B₂ given, no closed form)",
     short:"1 vert. wall (Newton)", method:"Newton's method",
-    img:"images/case6.png",
+    img:"Case6.png",
     cap:"Left wall slope θ, right wall slope φ over run B₂, then one vertical side wall. The relation A³ = (Q²/g)·B is a sextic in y_c with no closed form — solved numerically.",
     formula:"\\Big(\\tfrac{y_c^{2}}{2w}+B_2\\,y_c-\\tfrac{B_2^{2}v}{2}\\Big)^{3}=\\dfrac{Q^{2}}{g}\\Big(\\tfrac{y_c}{w}+B_2\\Big)",
     fields:[
@@ -548,7 +548,7 @@ function buildNav(){
   });
 }
 
-function katex(el,tex){
+function renderTeX(el,tex){
   try{ window.katex.render(tex,el,{throwOnError:false,displayMode:true}); }
   catch(e){ el.textContent=tex; }
 }
@@ -571,7 +571,7 @@ function render(){
   img.src=c.img;
 
   // formula
-  katex(document.getElementById('formulaBox'), c.formula);
+  renderTeX(document.getElementById('formulaBox'), c.formula);
 
   // inputs
   const wrap=document.getElementById('inputs'); wrap.innerHTML='';
